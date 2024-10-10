@@ -1,0 +1,113 @@
+import customtkinter as ctk
+from tkinter import filedialog, messagebox
+import logging
+import os
+
+def configure_logging():
+  logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+      logging.FileHandler('app.log'),
+      logging.StreamHandler()
+    ]
+  )
+
+def process_data(input_file: str, output_file: str, lines_to_save: int = 100, progress_callback=None) -> None:
+  try:
+    with open(input_file, 'r') as file:
+      front_lines = [next(file) for _ in range(lines_to_save)]
+
+      back_lines = []
+      for line in file:
+        back_lines.append(line)
+        if len(back_lines) > lines_to_save:
+          back_lines.pop(0)
+
+    with open(output_file, 'w') as file:
+      file.writelines(front_lines + back_lines)
+
+    logging.info(f"Обработка завершена. Данные сохранены в '{output_file}'.")
+    messagebox.showinfo("Успех", f"Обработка завершена. Данные сохранены в '{output_file}'.")
+
+  except FileNotFoundError:
+    logging.error(f"Файл '{input_file}' не найден.")
+    messagebox.showerror("Ошибка", f"Файл '{input_file}' не найден.")
+  except IndexError:
+    logging.warning(f"Количество строк в файле меньше, чем {lines_to_save}. Сохранён весь файл.")
+  except Exception as e:
+    logging.exception(f"Произошла ошибка: {e}")
+    messagebox.showerror("Ошибка", f"Произошла ошибка: {e}")
+  finally:
+    if progress_callback:
+      progress_callback()
+
+def select_file(entry, title="Выберите файл"):
+  filepath = filedialog.askopenfilename(title=title, filetypes=[("Text files", "*.txt")])
+  entry.delete(0, tk.END)
+  entry.insert(0, filepath)
+
+def save_file(entry):
+  filepath = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt")])
+  entry.delete(0, tk.END)
+  entry.insert(0, filepath)
+
+def on_run(input_entry, output_entry, lines_entry, progress):
+  input_file = input_entry.get()
+  output_file = output_entry.get()
+  try:
+    lines_to_save = int(lines_entry.get())
+  except ValueError:
+    messagebox.showerror("Ошибка", "Неверное количество строк.")
+    return
+
+  if not input_file or not output_file:
+    messagebox.showerror("Ошибка", "Укажите входной и выходной файл.")
+    return
+
+  progress.start()
+  process_data(input_file, output_file, lines_to_save, progress.stop)
+
+def main():
+  configure_logging()
+
+  app = ctk.CTk()
+  app.title("Обработка данных зарядных станций")
+  app.geometry("600x400")
+  ctk.set_default_color_theme("dark-blue")
+
+  header_label = ctk.CTkLabel(app, text="Обработка данных зарядных станций", font=("Helvetica", 18))
+  header_label.pack(pady=20)
+
+  frame = ctk.CTkFrame(app)
+  frame.pack(pady=10, padx=10, fill="both", expand=True)
+
+  ctk.CTkLabel(frame, text="Входной файл:").grid(row=0, column=0, padx=10, pady=5, sticky=tk.W)
+  input_entry = ctk.CTkEntry(frame, width=400)
+  input_entry.grid(row=0, column=1, padx=10, pady=5)
+
+  input_button = ctk.CTkButton(frame, text="Выбрать...", command=lambda: select_file(input_entry))
+  input_button.grid(row=0, column=2, padx=10, pady=5)
+
+  ctk.CTkLabel(frame, text="Выходной файл:").grid(row=1, column=0, padx=10, pady=5, sticky=tk.W)
+  output_entry = ctk.CTkEntry(frame, width=400)
+  output_entry.grid(row=1, column=1, padx=10, pady=5)
+
+  output_button = ctk.CTkButton(frame, text="Выбрать...", command=lambda: save_file(output_entry))
+  output_button.grid(row=1, column=2, padx=10, pady=5)
+
+  ctk.CTkLabel(frame, text="Количество строк для сохранения:").grid(row=2, column=0, padx=10, pady=5, sticky=tk.W)
+  lines_entry = ctk.CTkEntry(frame, width=100)
+  lines_entry.insert(0, "100")
+  lines_entry.grid(row=2, column=1, padx=10, pady=5, sticky=tk.W)
+
+  run_button = ctk.CTkButton(app, text="Запустить", command=lambda: on_run(input_entry, output_entry, lines_entry, progress))
+  run_button.pack(pady=10)
+
+  progress = ctk.CTkProgressBar(app, orientation="horizontal", mode="indeterminate", width=300)
+  progress.pack(pady=5)
+ 
+  app.mainloop()
+
+if __name__ == "__main__":
+  main()
